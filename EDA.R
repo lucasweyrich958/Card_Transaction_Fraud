@@ -3,7 +3,7 @@ library(arrow)
 library(dplyr)
 library(ggplot2)
 library(reshape2)
-library(ggbreak)
+library(patchwork)
 library(lubridate)
 
 set.seed(2024)
@@ -49,25 +49,47 @@ ggplot(data = cor_matrix, aes(x = Var1, y = Var2, fill = value)) +
   coord_fixed() +
   labs(title = "Correlation Heatmap", x = "Variable", y = "Variable")
 
-#Time-Series for Transactions
-tx_transactions = tx_raw %>%
+#----Auto- and Cross-correlations----
+tx_nofraud = tx_transactions %>%
+  filter(Class == 0) %>%
+  select(transaction_count)
+tx_nofraud = tx_nofraud$transaction_count
+
+tx_nofraud_autocor = acf(tx_nofraud, lag.max = 3, plot = T)
+
+tx_fraud = tx_transactions %>%
+  filter(Class == 1) %>%
+  select(transaction_count)
+tx_fraud = tx_fraud$transaction_count
+
+tx_fraud_autocor = acf(tx_fraud, lag.max =3, plot = F)
+
+tx_nofraud_autocor
+tx_fraud_autocor
+
+#----Time-Series for Transactions----
+tx_transactions <- tx_raw %>%
   mutate(datetime_hour = floor_date(datetime, "hour")) %>%
   group_by(datetime_hour, Class) %>%
   summarise(transaction_count = n())
 
-tx_trans_1 = ggplot(tx_transactions, aes(x = datetime_hour, y = transaction_count, color = Class)) +
+tx_trans_1 <- ggplot(tx_transactions, aes(x = datetime_hour, y = transaction_count, color = as.factor(Class))) +
   geom_line() +
   theme_minimal() +
-  labs(title = 'Fraud Txs',y = "Number of Transactions", x = "Time (Hourly)") +
-  scale_y_continuous(limits = c(0, 50))
+  labs(title = 'Fraud Txs', y = "Number of Transactions", x = "Time (Hourly)") +
+  scale_y_continuous(limits = c(0, 50)) +
+  theme(legend.position = "none") +
+  annotate("text", x = max(tx_transactions$datetime_hour), y = 45, label = expression(rho[1] == -0.226), hjust = 1)
 
-tx_trans_0 = ggplot(tx_transactions, aes(x = datetime_hour, y = transaction_count, color = Class)) +
+tx_trans_0 <- ggplot(tx_transactions, aes(x = datetime_hour, y = transaction_count, color = as.factor(Class))) +
   geom_line() +
   theme_minimal() +
   labs(title = 'Non-Fraud Txs', x = NULL, y = NULL, color = "Class") +
-  scale_y_continuous(limits = c(1000, max(tx_transactions$transaction_count)))
+  scale_y_continuous(limits = c(1000, max(tx_transactions$transaction_count))) +
+  theme(legend.position = "none") +
+  annotate("text", x = max(tx_transactions$datetime_hour), y = max(tx_transactions$transaction_count) - 50, label = expression(rho[1] == 0.918), hjust = 1)
 
 # Combine the two plots
-tx_transactions_plot = (tx_trans_0 / tx_trans_1) + plot_layout(heights = c(2, 1))
+tx_transactions_plot <- (tx_trans_0 / tx_trans_1) + plot_layout(heights = c(2, 1))
 print(tx_transactions_plot)
 
