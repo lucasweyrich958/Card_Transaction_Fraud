@@ -1,7 +1,16 @@
 ---
 title: "DATA622 Assignment 1"
-format: html
-editor: visual
+author: "Norah Jones"
+date: "March 22nd, 2021"
+toc: true
+format:
+  html:
+    html-math-method: katex
+    code-tools: true
+    self-contained: true
+    toc_depth: 2
+execute:
+  warning: false
 ---
 
 ```{r}
@@ -14,9 +23,39 @@ library(patchwork)
 library(lubridate)
 ```
 
+## Project
+
+### **Deliverables**
+
+Explore how to analyze and predict an outcome based on the data available. This will be an exploratory exercise, so feel free to show errors and warnings that raise during the analysis. Test the code with both datasets selected and compare the results.
+
+### **Goals**
+
+1.  Are the columns of your data correlated?
+
+2.  Are there labels in your data? Did that impact your choice of algorithm?
+
+3.  What are the pros and cons of each algorithm you selected?
+
+4.  How your choice of algorithm relates to the datasets (was your choice of algorithm impacted by the datasets you chose)?
+
+5.  Which result will you trust if you need to make a business decision?
+
+6.  Do you think an analysis could be prone to errors when using too much data, or when using the least amount possible?
+
+7.  How does the analysis between data sets compare?
+
+## Large DataSet (End to End ML Analysis)
+
+### Dataset Introduction
+
+### Data Exploration & Plots
+
 ```{r}
 set.seed(2024)
-path = "C:/Users/f9tbqno/Downloads/creditcard.parquet" #Set path of Parquet File downloaded from Github repo: https://github.com/lucasweyrich958/DATA622/blob/main/sales.parquet
+path = "https://github.com/BanuB/Card_Transaction_Fraud/raw/refs/heads/master/creditcard.parquet" 
+
+#Set path of Parquet File downloaded from Github repo: https://github.com/lucasweyrich958/DATA622/blob/main/sales.parquet
 
 tx_raw = read_parquet(path)
 
@@ -43,7 +82,7 @@ ggplot(tx_1, aes(x = Amount)) +
 
 #Correlation Heatmap
 tx_raw_numeric = tx_raw %>%
-  select(!c(Class, datetime))
+  dplyr::select(!c(Class, datetime))
 cor_matrix = cor(tx_raw_numeric)
 cor_matrix = melt(cor_matrix)
 
@@ -57,24 +96,6 @@ ggplot(data = cor_matrix, aes(x = Var1, y = Var2, fill = value)) +
                                    size = 10, hjust = 1)) +
   coord_fixed() +
   labs(title = "Correlation Heatmap", x = "Variable", y = "Variable")
-
-#----Auto- and Cross-correlations----
-tx_nofraud = tx_transactions %>%
-  filter(Class == 0) %>%
-  select(transaction_count)
-tx_nofraud = tx_nofraud$transaction_count
-
-tx_nofraud_autocor = acf(tx_nofraud, lag.max = 3, plot = T)
-
-tx_fraud = tx_transactions %>%
-  filter(Class == 1) %>%
-  select(transaction_count)
-tx_fraud = tx_fraud$transaction_count
-
-tx_fraud_autocor = acf(tx_fraud, lag.max =3, plot = F)
-
-tx_nofraud_autocor
-tx_fraud_autocor
 
 #----Time-Series for Transactions----
 tx_transactions <- tx_raw %>%
@@ -101,4 +122,44 @@ tx_trans_0 <- ggplot(tx_transactions, aes(x = datetime_hour, y = transaction_cou
 # Combine the two plots
 tx_transactions_plot <- (tx_trans_0 / tx_trans_1) + plot_layout(heights = c(2, 1))
 print(tx_transactions_plot)
+
+#----Auto- and Cross-correlations----
+tx_nofraud = tx_transactions %>%
+  filter(Class == 0) %>%
+  dplyr::select(transaction_count)
+tx_nofraud = tx_nofraud$transaction_count
+
+tx_nofraud_autocor = acf(tx_nofraud, lag.max = 3, plot = T)
+
+tx_fraud = tx_transactions %>%
+  filter(Class == 1) %>%
+  dplyr::select(transaction_count)
+tx_fraud = tx_fraud$transaction_count
+
+tx_fraud_autocor = acf(tx_fraud, lag.max =3, plot = F)
+
+tx_nofraud_autocor
+tx_fraud_autocor
+
+
 ```
+
+### Data Preparation
+
+### Algorithm Selection
+
+### Large DataSet Essay Summary
+
+## Small DataSet (End to End ML Analysis)
+
+### Dataset Introduction
+
+### Data Exploration & Plots
+
+### Data Preparation 
+
+### Algorithm Selection/Build Models
+
+### Large DataSet Essay Summary
+
+## Joint Comparison and Summary Essay
