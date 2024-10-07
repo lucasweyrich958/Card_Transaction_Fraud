@@ -49,24 +49,6 @@ ggplot(data = cor_matrix, aes(x = Var1, y = Var2, fill = value)) +
   coord_fixed() +
   labs(title = "Correlation Heatmap", x = "Variable", y = "Variable")
 
-#----Auto- and Cross-correlations----
-tx_nofraud = tx_transactions %>%
-  filter(Class == 0) %>%
-  select(transaction_count)
-tx_nofraud = tx_nofraud$transaction_count
-
-tx_nofraud_autocor = acf(tx_nofraud, lag.max = 3, plot = T)
-
-tx_fraud = tx_transactions %>%
-  filter(Class == 1) %>%
-  select(transaction_count)
-tx_fraud = tx_fraud$transaction_count
-
-tx_fraud_autocor = acf(tx_fraud, lag.max =3, plot = F)
-
-tx_nofraud_autocor
-tx_fraud_autocor
-
 #----Time-Series for Transactions----
 tx_transactions <- tx_raw %>%
   mutate(datetime_hour = floor_date(datetime, "hour")) %>%
@@ -92,4 +74,22 @@ tx_trans_0 <- ggplot(tx_transactions, aes(x = datetime_hour, y = transaction_cou
 # Combine the two plots
 tx_transactions_plot <- (tx_trans_0 / tx_trans_1) + plot_layout(heights = c(2, 1))
 print(tx_transactions_plot)
+
+#----Auto- and Cross-correlations----
+tx_nofraud = tx_transactions %>%
+  filter(Class == 0) %>%
+  select(transaction_count)
+tx_nofraud = tx_nofraud$transaction_count
+
+tx_nofraud_autocor = acf(tx_nofraud, lag.max = 3, plot = T)
+
+tx_fraud = tx_transactions %>%
+  filter(Class == 1) %>%
+  select(transaction_count)
+tx_fraud = tx_fraud$transaction_count
+
+tx_fraud_autocor = acf(tx_fraud, lag.max =3, plot = F)
+
+tx_nofraud_autocor
+tx_fraud_autocor
 
