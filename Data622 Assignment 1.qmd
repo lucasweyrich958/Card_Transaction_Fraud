@@ -1,7 +1,7 @@
 ---
 title: "DATA622 Assignment 1"
-author: "Norah Jones"
-date: "March 22nd, 2021"
+author: "Banu & Lucas"
+date: "10/10/2024"
 toc: true
 format:
   html:
@@ -45,20 +45,24 @@ Explore how to analyze and predict an outcome based on the data available. This 
 
 7.  How does the analysis between data sets compare?
 
-## Large DataSet (End to End ML Analysis)
+## Large Data Set (End to End ML Analysis)
 
-### Dataset Introduction
+### Data Set Introduction
+
+The large data set consists of about 284,000 card transactions that are labelled as non-fraud and fraud. It is a real data set from a European financial institution, which is why the features are masked. They are the result of extensive PCA. Additionally, it is a highly imbalanced data set, as there are several orders of magnitude more non-fraud than fraud transactions.
 
 ### Data Exploration & Plots
 
 ```{r}
 set.seed(2024)
 path = "https://github.com/BanuB/Card_Transaction_Fraud/raw/refs/heads/master/creditcard.parquet" 
-
+path = "C:\\Users\\f9tbqno\\Downloads\\creditcard.parquet"
 #Set path of Parquet File downloaded from Github repo: https://github.com/lucasweyrich958/DATA622/blob/main/sales.parquet
 
 tx_raw = read_parquet(path)
+```
 
+```{r}
 summary(tx_raw)
 tx_raw$Class = as.factor(tx_raw$Class) #Convert Class column to factor
 
@@ -67,7 +71,7 @@ tx_raw = tx_raw %>%
 
 ggplot(tx_raw, aes(x = Amount, fill = Class)) +
   geom_histogram(position = "dodge", bins = 60) +
-  labs(title = "Histogram of Amounts by Class", x = "Amount ($)", y = "Frequency") +
+  labs(title = "Histogram of Amounts by Class (< 500 USD)", x = "Amount (USD)", y = "Frequency") +
   theme_minimal() +
   scale_fill_manual(values = c('grey', 'green')) +
   xlim(0, 500)
@@ -77,7 +81,7 @@ tx_1 = tx_raw %>%
 
 ggplot(tx_1, aes(x = Amount)) +
   geom_histogram(position = "dodge", bins = 60) +
-  labs(title = "Histogram of Amounts for Class Fraud", x = "Amount ($)", y = "Frequency") +
+  labs(title = "Histogram of Amounts for Class Fraud", x = "Amount (USD)", y = "Frequency") +
   theme_minimal()
 
 #Correlation Heatmap
@@ -146,9 +150,123 @@ tx_fraud_autocor
 
 ### Data Preparation
 
+```{r}
+set.seed(2024)
+library(caret)
+library(e1071)
+library(randomForest)
+library(rpart)
+library(pROC)
+library(ranger)
+library(ranger)
+
+tx_raw$Class = as.factor(tx_raw$Class)
+
+# Ensure datetime is of the correct type
+tx_raw$datetime = as.POSIXct(tx_raw$datetime)
+
+# Split the data into training and testing sets
+trainIndex = createDataPartition(tx_raw$Class, p = 0.8, list = FALSE)
+dataTrain = tx_raw[trainIndex, ]
+dataTest = tx_raw[-trainIndex, ]
+
+#Define CV
+train_control = trainControl(method = "cv", number = 10)
+```
+
 ### Algorithm Selection
 
-### Large DataSet Essay Summary
+Given the fact the this is a highly imbalanced data set, a weak learner, such as a decision tree or logistic regression will likely not be very successful. Therefore, the better choice will likely be an ensemble. In order to test this, we will run a logistic regression, a single decision tree, a random forest and a XGBoost tree. Then, we will compare measures for accuracy to understand the differences.
+
+#### Train Models
+
+```{r}
+set.seed(2024)
+#Logistic Regression
+time_logistic_train = system.time({
+  logistic_model = train(Class ~ ., data = dataTrain, method = "glm", family = "binomial", trControl = train_control)})
+
+#Decision Tree
+time_tree_train = system.time({
+  tree_model = train(Class ~ ., data = dataTrain, method = "rpart", trControl = train_control)})
+
+#Random Forest
+rf_grid = expand.grid(
+  mtry = c(2, 4, 6),
+  splitrule = c("gini", "extratrees"),
+  min.node.size = c(1, 5, 10)
+)
+
+time_rf_train = system.time({
+  rf_model = train(Class ~ ., data = dataTrain, method = "ranger", trControl = train_control, tuneGrid = rf_grid)})
+```
+
+#### Predictions and Evaluation
+
+```{r}
+#Logistic Regression Prediction
+time_logistic_pred = system.time({
+  logistic_pred = predict(logistic_model, dataTest)
+  logistic_probs = predict(logistic_model, dataTest, type = "prob")[, 2]
+})
+
+#Decision Tree Prediction
+time_tree_pred = system.time({
+  tree_pred = predict(tree_model, dataTest)
+  tree_probs = predict(tree_model, dataTest, type = "prob")[, 2]
+})
+
+#Random Forest Prediction
+time_rf_pred = system.time({
+  rf_pred = predict(rf_model, dataTest)
+  rf_probs = predict(rf_model, dataTest, type = "prob")[, 2]
+})
+
+# Logistic Regression Confusion Matrix
+confusionMatrix(logistic_pred, dataTest$Class)
+
+# Decision Tree Confusion Matrix
+confusionMatrix(tree_pred, dataTest$Class)
+
+# Random Forest Confusion Matrix
+confusionMatrix(rf_pred, dataTest$Class)
+```
+
+```{r}
+#Benchmarking Training and Prediction Time
+benchmark_results = data.frame(
+  Model = c("Logistic Regression", "Decision Tree", "Random Forest"),
+  Training_Time = c(time_logistic_train[3], time_tree_train[3], time_rf_train[3]),
+  Prediction_Time = c(time_logistic_pred[3], time_tree_pred[3], time_rf_pred[3])
+)
+
+print(benchmark_results)
+```
+
+```{r}
+#ROC and AUC Curves
+#ROC
+roc_logistic = roc(dataTest$Class, logistic_probs)
+roc_tree = roc(dataTest$Class, tree_probs)
+roc_rf = roc(dataTest$Class, rf_probs)
+
+plot(roc_logistic, col = "red", main = "ROC Curves", lwd = 2)
+lines(roc_tree, col = "blue", lwd = 2)
+lines(roc_rf, col = "green", lwd = 2)
+legend("bottomright", legend = c("Logistic Regression", "Decision Tree", "Random Forest"),
+       col = c("red", "blue", "green"), lwd = 2)
+
+#AUC
+auc_logistic = auc(roc_logistic)
+auc_tree = auc(roc_tree)
+auc_rf = auc(roc_rf)
+
+print(paste("AUC for Logistic Regression:", auc_logistic))
+print(paste("AUC for Decision Tree:", auc_tree))
+print(paste("AUC for Random Forest:", auc_rf))
+```
+
+### Large Dataset Essay Summary
 
 ## Small DataSet (End to End ML Analysis)
 
@@ -156,7 +274,7 @@ tx_fraud_autocor
 
 ### Data Exploration & Plots
 
-### Data Preparation 
+### Data Preparation
 
 ### Algorithm Selection/Build Models
 
