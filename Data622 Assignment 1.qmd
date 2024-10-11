@@ -21,6 +21,7 @@ library(ggplot2)
 library(reshape2)
 library(patchwork)
 library(lubridate)
+library(rpart.plot)
 ```
 
 ## Project
@@ -135,18 +136,20 @@ tx_nofraud = tx_nofraud$transaction_count
 
 tx_nofraud_autocor = acf(tx_nofraud, lag.max = 3, plot = T)
 
-tx_fraud = tx_transactions %>%
-  filter(Class == 1) %>%
-  dplyr::select(transaction_count)
-tx_fraud = tx_fraud$transaction_count
-
-tx_fraud_autocor = acf(tx_fraud, lag.max =3, plot = F)
-
 tx_nofraud_autocor
-tx_fraud_autocor
 
 
 ```
+
+When investigating the plots from the EDA above one thing becomes clear: the data set is HEAVILY imbalanced. As discussed in the introduction above, this is unsurprising given the nature of non-fraud versus fraud transactions; however, this is an important consideration when selecting the models to run. Weak learners will likely not be as strong in performance as ensemble methods would be.
+
+Additionally, there are a few more interesting observations. For example, the correlation matrix between all features show no strong correlation between each other. This is important for several machine learning algorithms, and considering that this data set has undergone feature engineering and PCA, it is unsurprising that this is case. Nevertheless, this plot should be part of any machine learning implementation.
+
+Looking at the time-series graph, plotting the amounts of transactions per hour, over the time span of the data set, the cyclic nature of the non-fraud transactions is very apparent. This is not existent in the fraud transactions, which are mostly randomly happening. This can also be observed in the auto-correlations: &rho; for the non-fraud transactions is 0.92, which points to a strong predictability for the next data point (i.e., after an increase in count, another increase if followed). The negative &rho; of -0.23 of the fraudulent transactions points to a more random behavior across these two and a half days of time period of the data set. This feature will surely be quite important for the algorithm during training.
+
+Lastly, these auto-correlations can be seen in the ACF plot, that shows different lags. It can be seen that the strongest lag is 1, with decreasing auto-correlations with larger lags.
+
+Next, we split the data to prepare for the machine learning implementation. We chose to split the data 80/20 for training and test set. We deferred from a validation set as we are not going to engage in hyper parameter tuning in this exercise.
 
 ### Data Preparation
 
@@ -176,7 +179,7 @@ train_control = trainControl(method = "cv", number = 10)
 
 ### Algorithm Selection
 
-Given the fact the this is a highly imbalanced data set, a weak learner, such as a decision tree or logistic regression will likely not be very successful. Therefore, the better choice will likely be an ensemble. In order to test this, we will run a logistic regression, a single decision tree, a random forest and a XGBoost tree. Then, we will compare measures for accuracy to understand the differences.
+Given the fact the this is a highly imbalanced data set, a weak learner, such as a decision tree or logistic regression will likely not be very successful. Therefore, the better choice will likely be an ensemble. In order to test this, we will run a logistic regression, and a single decision tree. We wanted to also include a random forest, however, the large data set was computationally too expensive. In the real world, we would certainly use some type of ensemble method, like random forest and XGBoost.
 
 #### Train Models
 
@@ -224,9 +227,12 @@ benchmark_results = data.frame(
 print(benchmark_results)
 ```
 
+The performance of both, the logistic regression and the decision tree are good, with above 90% accuracy. Looking at the timing benchmarks, both models trained within about one minute, and took only seconds to predict the test set of 50,000 rows. As mentioned above, the random forest trained much longer, on the magnitude of hours, so we chose to not continue with this at this time.
+
 ```{r}
 #ROC and AUC Curves
 #ROC
+
 roc_logistic = roc(dataTest$Class, logistic_probs)
 roc_tree = roc(dataTest$Class, tree_probs)
 
@@ -241,7 +247,21 @@ auc_tree = auc(roc_tree)
 
 print(paste("AUC for Logistic Regression:", auc_logistic))
 print(paste("AUC for Decision Tree:", auc_tree))
+
+coefficients <- tidy(logistic_model$finalModel)
+coefficients <- coefficients[coefficients$term != "(Intercept)", ]  # Remove intercept for better visualization
+ggplot(coefficients, aes(x = reorder(term, estimate), y = estimate)) +
+  geom_bar(stat = "identity") +
+  coord_flip() +
+  labs(title = "Logistic Regression Coefficients", x = "Features", y = "Coefficient") +
+  theme_minimal()
+
+rpart.plot(tree_model$finalModel)
 ```
+
+In order to further understand the predictive quality of both models, we decided to compute ROC curves that plot specificity against sensitivity, and here found, interestingly, that the logistic regression was much better across the board than the decision tree. It is likely that the tree over fit, which leads to diminished predictive quality. While the accuracy is still high, this does not mean that it stays high with other unseen data.
+
+Therefore, in the current case, we'd be deciding to utilize logistic regression over the decision tree. While again, an ensemble of trees would likely outperform the logistic regression, even with a smaller data set.
 
 ### Large Dataset Essay Summary
 
