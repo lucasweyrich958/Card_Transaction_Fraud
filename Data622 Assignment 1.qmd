@@ -57,8 +57,6 @@ The large data set consists of about 284,000 card transactions that are labelled
 ```{r}
 set.seed(2024)
 path = "https://github.com/BanuB/Card_Transaction_Fraud/raw/refs/heads/master/creditcard.parquet" 
-#path = "C:\\Users\\f9tbqno\\Downloads\\creditcard.parquet"
-#Set path of Parquet File downloaded from Github repo: https://github.com/lucasweyrich958/DATA622/blob/main/sales.parquet
 
 tx_raw = read_parquet(path)
 ```
