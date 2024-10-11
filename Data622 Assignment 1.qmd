@@ -56,7 +56,7 @@ The large data set consists of about 284,000 card transactions that are labelled
 ```{r}
 set.seed(2024)
 path = "https://github.com/BanuB/Card_Transaction_Fraud/raw/refs/heads/master/creditcard.parquet" 
-path = "C:\\Users\\f9tbqno\\Downloads\\creditcard.parquet"
+#path = "C:\\Users\\f9tbqno\\Downloads\\creditcard.parquet"
 #Set path of Parquet File downloaded from Github repo: https://github.com/lucasweyrich958/DATA622/blob/main/sales.parquet
 
 tx_raw = read_parquet(path)
@@ -189,16 +189,6 @@ time_logistic_train = system.time({
 #Decision Tree
 time_tree_train = system.time({
   tree_model = train(Class ~ ., data = dataTrain, method = "rpart", trControl = train_control)})
-
-#Random Forest
-rf_grid = expand.grid(
-  mtry = c(2, 4, 6),
-  splitrule = c("gini", "extratrees"),
-  min.node.size = c(1, 5, 10)
-)
-
-time_rf_train = system.time({
-  rf_model = train(Class ~ ., data = dataTrain, method = "ranger", trControl = train_control, tuneGrid = rf_grid)})
 ```
 
 #### Predictions and Evaluation
@@ -216,28 +206,19 @@ time_tree_pred = system.time({
   tree_probs = predict(tree_model, dataTest, type = "prob")[, 2]
 })
 
-#Random Forest Prediction
-time_rf_pred = system.time({
-  rf_pred = predict(rf_model, dataTest)
-  rf_probs = predict(rf_model, dataTest, type = "prob")[, 2]
-})
-
 # Logistic Regression Confusion Matrix
 confusionMatrix(logistic_pred, dataTest$Class)
 
 # Decision Tree Confusion Matrix
 confusionMatrix(tree_pred, dataTest$Class)
-
-# Random Forest Confusion Matrix
-confusionMatrix(rf_pred, dataTest$Class)
 ```
 
 ```{r}
 #Benchmarking Training and Prediction Time
 benchmark_results = data.frame(
-  Model = c("Logistic Regression", "Decision Tree", "Random Forest"),
-  Training_Time = c(time_logistic_train[3], time_tree_train[3], time_rf_train[3]),
-  Prediction_Time = c(time_logistic_pred[3], time_tree_pred[3], time_rf_pred[3])
+  Model = c("Logistic Regression", "Decision Tree"),
+  Training_Time = c(time_logistic_train[3], time_tree_train[3]),
+  Prediction_Time = c(time_logistic_pred[3], time_tree_pred[3])
 )
 
 print(benchmark_results)
@@ -248,22 +229,18 @@ print(benchmark_results)
 #ROC
 roc_logistic = roc(dataTest$Class, logistic_probs)
 roc_tree = roc(dataTest$Class, tree_probs)
-roc_rf = roc(dataTest$Class, rf_probs)
 
 plot(roc_logistic, col = "red", main = "ROC Curves", lwd = 2)
 lines(roc_tree, col = "blue", lwd = 2)
-lines(roc_rf, col = "green", lwd = 2)
-legend("bottomright", legend = c("Logistic Regression", "Decision Tree", "Random Forest"),
-       col = c("red", "blue", "green"), lwd = 2)
+legend("bottomright", legend = c("Logistic Regression", "Decision Tree"),
+       col = c("red", "blue"), lwd = 2)
 
 #AUC
 auc_logistic = auc(roc_logistic)
 auc_tree = auc(roc_tree)
-auc_rf = auc(roc_rf)
 
 print(paste("AUC for Logistic Regression:", auc_logistic))
 print(paste("AUC for Decision Tree:", auc_tree))
-print(paste("AUC for Random Forest:", auc_rf))
 ```
 
 ### Large Dataset Essay Summary
