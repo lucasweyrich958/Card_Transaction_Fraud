@@ -15,12 +15,25 @@ execute:
 
 ```{r}
 #Load Packages
+library(kableExtra)
 library(arrow)
 library(dplyr)
 library(ggplot2)
 library(reshape2)
 library(patchwork)
 library(lubridate)
+library(DataExplorer)
+library(skimr)
+#install.packages("ROSE")
+library(DescTools)
+library(corrplot)
+library(ggcorrplot)
+library(caret)
+library(rpart)
+library(car)
+library(rattle)
+library(ROSE)
+
 ```
 
 ## Project
@@ -51,99 +64,6 @@ Explore how to analyze and predict an outcome based on the data available. This 
 
 ### Data Exploration & Plots
 
-```{r}
-set.seed(2024)
-path = "https://github.com/BanuB/Card_Transaction_Fraud/raw/refs/heads/master/creditcard.parquet" 
-
-#Set path of Parquet File downloaded from Github repo: https://github.com/lucasweyrich958/DATA622/blob/main/sales.parquet
-
-tx_raw = read_parquet(path)
-
-summary(tx_raw)
-tx_raw$Class = as.factor(tx_raw$Class) #Convert Class column to factor
-
-tx_raw = tx_raw %>%
-  mutate(datetime = as.POSIXct("2024-01-01 00:00:00", tz = "UTC") + seconds(Time)) #Make new column that shows datetime
-
-ggplot(tx_raw, aes(x = Amount, fill = Class)) +
-  geom_histogram(position = "dodge", bins = 60) +
-  labs(title = "Histogram of Amounts by Class", x = "Amount ($)", y = "Frequency") +
-  theme_minimal() +
-  scale_fill_manual(values = c('grey', 'green')) +
-  xlim(0, 500)
-
-tx_1 = tx_raw %>%
-  filter(Class == 1)
-
-ggplot(tx_1, aes(x = Amount)) +
-  geom_histogram(position = "dodge", bins = 60) +
-  labs(title = "Histogram of Amounts for Class Fraud", x = "Amount ($)", y = "Frequency") +
-  theme_minimal()
-
-#Correlation Heatmap
-tx_raw_numeric = tx_raw %>%
-  dplyr::select(!c(Class, datetime))
-cor_matrix = cor(tx_raw_numeric)
-cor_matrix = melt(cor_matrix)
-
-ggplot(data = cor_matrix, aes(x = Var1, y = Var2, fill = value)) +
-  geom_tile() +
-  scale_fill_gradient2(low = "blue", high = "red", mid = "white", 
-                       midpoint = 0, limit = c(-1, 1), space = "Lab", 
-                       name = "Correlation") +
-  theme_minimal() + 
-  theme(axis.text.x = element_text(angle = 45, vjust = 1, 
-                                   size = 10, hjust = 1)) +
-  coord_fixed() +
-  labs(title = "Correlation Heatmap", x = "Variable", y = "Variable")
-
-#----Time-Series for Transactions----
-tx_transactions <- tx_raw %>%
-  mutate(datetime_hour = floor_date(datetime, "hour")) %>%
-  group_by(datetime_hour, Class) %>%
-  summarise(transaction_count = n())
-
-tx_trans_1 <- ggplot(tx_transactions, aes(x = datetime_hour, y = transaction_count, color = as.factor(Class))) +
-  geom_line() +
-  theme_minimal() +
-  labs(title = 'Fraud Txs', y = "Number of Transactions", x = "Time (Hourly)") +
-  scale_y_continuous(limits = c(0, 50)) +
-  theme(legend.position = "none") +
-  annotate("text", x = max(tx_transactions$datetime_hour), y = 45, label = expression(rho[1] == -0.226), hjust = 1)
-
-tx_trans_0 <- ggplot(tx_transactions, aes(x = datetime_hour, y = transaction_count, color = as.factor(Class))) +
-  geom_line() +
-  theme_minimal() +
-  labs(title = 'Non-Fraud Txs', x = NULL, y = NULL, color = "Class") +
-  scale_y_continuous(limits = c(1000, max(tx_transactions$transaction_count))) +
-  theme(legend.position = "none") +
-  annotate("text", x = max(tx_transactions$datetime_hour), y = max(tx_transactions$transaction_count) - 50, label = expression(rho[1] == 0.918), hjust = 1)
-
-# Combine the two plots
-tx_transactions_plot <- (tx_trans_0 / tx_trans_1) + plot_layout(heights = c(2, 1))
-print(tx_transactions_plot)
-
-#----Auto- and Cross-correlations----
-tx_nofraud = tx_transactions %>%
-  filter(Class == 0) %>%
-  dplyr::select(transaction_count)
-tx_nofraud = tx_nofraud$transaction_count
-
-tx_nofraud_autocor = acf(tx_nofraud, lag.max = 3, plot = T)
-
-tx_fraud = tx_transactions %>%
-  filter(Class == 1) %>%
-  dplyr::select(transaction_count)
-tx_fraud = tx_fraud$transaction_count
-
-tx_fraud_autocor = acf(tx_fraud, lag.max =3, plot = F)
-
-tx_nofraud_autocor
-tx_fraud_autocor
-
-
-```
-
 ### Data Preparation
 
 ### Algorithm Selection
@@ -156,9 +76,151 @@ tx_fraud_autocor
 
 ### Data Exploration & Plots
 
-### Data Preparation 
+```{r}
+
+
+inputf <- read.csv("C:/Users/Banu/Documents/RScriptfiles/DATA 622/HOMEWORK1/Gitfiles/lending_club_loan_two.csv")
+
+parquet = tempfile(fileext = ".parquet")
+write_parquet(inputf, sink = parquet)
+
+inputf1 = read_parquet(parquet)
+
+#Glimpse variables
+introduce(inputf1)
+plot_intro(inputf1)
+plot_missing(inputf1)
+glimpse(inputf1)
+unique(inputf1$loan_status)
+skim(inputf1) %>% kable()
+sapply(inputf1, function(x) sum(is.na(x))) %>% kable()
+
+
+
+
+
+
+```
+
+```{r}
+# Select numeric columns only
+ numeric_data<- inputf1[sapply(inputf1, is.numeric)]
+M<- cor(numeric_data,use="complete.obs")
+ # M %>% kable() %>%
+ #  kable_styling()
+
+ggcorrplot(M, type = "upper", outline.color = "white",
+           ggtheme = theme_classic,
+           #colors = c("#6D9EC1", "white", "#E46726"),
+           lab = TRUE, show.legend = FALSE, tl.cex = 8, lab_size = 3)
+           
+# Calculate the correlation matrix
+correlation_matrix <- cor(numeric_data, use="complete.obs")
+kable(correlation_matrix)
+corrplot(correlation_matrix, method="circle")
+
+
+
+```
+
+#### Review Distributions
+
+```{r}
+#Loan amt distribution
+ggplot(data=inputf1, aes(loan_amnt))+geom_histogram(bins = 40,color="blue",fill="lightblue")
+
+ggplot(inputf1, aes(x=grade, y=loan_amnt, fill=grade)) +
+  stat_summary(fun.y="sum", geom="bar") +
+  labs(y ="Total Loan Amount",title="Total loan amount based on loan grade")
+
+ggplot(data=inputf1, aes(grade,int_rate,fill=grade))+geom_boxplot(outlier.color = "blue")+labs(title="Box plot of Interest rate")
+
+plot_density(inputf1)
+
+
+#Distribution of loan amount and purpose
+Desc(inputf1$loan_amnt, main = "Loan amount distribution", plotit = TRUE)
+Desc(inputf1$purpose, main = "Loan purposes", plotit = TRUE)
+
+#Distribution by verification status
+inputf1 %>% group_by(verification_status) %>% summarise(mean(loan_amnt), var(loan_amnt), mean(int_rate),mean(annual_inc))
+ggplot(data = inputf1,aes(x = verification_status, y = loan_amnt))+geom_boxplot()
+
+ggplot(data=inputf1,aes(loan_amnt, fill=grade))+
+  geom_density(alpha=0.25) + 
+  facet_grid(grade ~ .)
+
+#Distribution of loan status and grade
+table(inputf1$loan_status, inputf1$grade)
+ggplot(inputf1, aes(x = int_rate))+ geom_histogram(aes(fill = grade)) + facet_wrap(~loan_status, ncol = 1)
+
+#Distribution of loan status and term
+table(inputf1$loan_status, inputf1$term)
+
+index = createDataPartition(y = inputf1$loan_status, p = 0.90)[[1]]
+loans.sample <- inputf1[-index,]
+ggplot(loans.sample, aes(x = loan_amnt, y = int_rate)) + geom_point(aes(color = term))
+
+```
+
+### Data Preparation
+
+```{r}
+
+loan = inputf1 %>% mutate(loan_outcome = ifelse(loan_status %in% c('Charged Off' , 'Default') , 1, ifelse(loan_status == 'Fully Paid' , 0 , 'No info')))
+
+barplot(table(loan$loan_outcome) , col = 'lightblue')
+
+head(loan)
+
+# Create the new dataset by filtering 0's and 1's in the loan_outcome and remove loan status.
+loannew = loan %>% dplyr::select(-loan_status) %>% filter(loan_outcome %in% c(0 , 1))
+
+dim(loannew)
+unique(loannew$loan_outcome)
+
+table(loannew$grade , factor(loannew$loan_outcome , c(0 , 1) , c('Fully Paid' , 'Default')))
+
+ggplot(loannew , aes(x = grade , y = ..count.. , fill = factor(loan_outcome , c(1 , 0) , c('Default' , 'Fully Paid')))) + 
+        geom_bar() + 
+        theme(legend.title = element_blank())
+```
 
 ### Algorithm Selection/Build Models
+
+```{r}
+index = createDataPartition(y = inputf1$loan_status, p = 0.8)[[1]]
+loans.test <- inputf1[-index,]
+loans.train <- inputf1[index,]
+#loans.rpart.0 <- rpart(loan_status ~ ., data = loans.train)
+
+loans.rpart.1 <- rpart(loan_status ~ . , data = loans.train, 
+                      control=rpart.control(minsplit=10, minbucket = 3, cp=0.0006))
+
+fancyRpartPlot(loans.rpart.1)
+
+unique(loans.train$emp_title)
+
+data_test_new <- loans.test                               # Duplicate test data set
+data_test_new$emp_title[which(!(data_test_new$emp_title %in% unique(loans.train$emp_title)))] <- NA  # Replace new levels by NA
+data_test_new$issue_d[which(!(data_test_new$issue_d %in% unique(loans.train$ issue_d)))] <- NA  # Replace new levels by NA
+data_test_new$title[which(!(data_test_new$title %in% unique(loans.train$title)))] <- NA  # Replace new levels by NA
+data_test_new$earliest_cr_line[which(!(data_test_new$earliest_cr_line %in% unique(loans.train$earliest_cr_line)))] <- NA  # Replace new levels by NA
+head(data_test_new)
+data_test_new$address[which(!(data_test_new$address %in% unique(loans.train$address)))] <- NA  # Replace new levels by NA
+head(data_test_new)
+
+
+predictions.1 <- (predict(loans.rpart.1, data_test_new , type = "class"))
+
+confusionMatrix(predictions.1,)
+
+levels(data_test_new$loan_status)
+
+roc.curve(data_test_new$loan_status, predict(loans.rpart.1, data_test_new, type = "prob")[,1], plot = TRUE)
+
+
+```
 
 ### Large DataSet Essay Summary
 
