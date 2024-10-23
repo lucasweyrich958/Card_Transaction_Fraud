@@ -1,11 +1,12 @@
 ---
-title: "DATA622 Assignment 1"
+title: "DATA622 Assignment 1 (Large and Small Dataset Machine Learning methods and analysis)"
 author: "Banu & Lucas"
 date: "10/10/2024"
 toc: true
 format:
   html:
     html-math-method: katex
+    code-fold: true
     code-tools: true
     self-contained: true
     toc_depth: 2
@@ -19,36 +20,655 @@ library(arrow)
 library(dplyr)
 library(ggplot2)
 library(reshape2)
+library(tidymodels)
+library(tidyr)
+library(broom)
 library(patchwork)
 library(lubridate)
 library(rpart.plot)
+library(kableExtra)
+library(DataExplorer)
+library(skimr)
+#install.packages("ranger")
+#install.packages("tidymodels")
+library(DescTools)
+library(corrplot)
+library(ggcorrplot)
+library(caret)
+library(rpart)
+library(car)
+library(rattle)
+library(ROSE)
+library(mice)
+library(MASS)
+library(fpp3)
+library(pROC)
+
 ```
 
 ## Project
 
-### **Deliverables**
+### **Deliverable**
 
-Explore how to analyze and predict an outcome based on the data available. This will be an exploratory exercise, so feel free to show errors and warnings that raise during the analysis. Test the code with both datasets selected and compare the results.
+1.  Explore how to analyze and predict an outcome based on the data available. This will be an exploratory exercise, so feel free to show errors and warnings that raise during the analysis. Test the code with both datasets selected and compare the results.
 
-### **Goals**
+    1.  Are the columns of your data correlated?
 
-1.  Are the columns of your data correlated?
+    2.  Are there labels in your data? Did that impact your choice of algorithm?
 
-2.  Are there labels in your data? Did that impact your choice of algorithm?
+    3.  What are the pros and cons of each algorithm you selected?
 
-3.  What are the pros and cons of each algorithm you selected?
+    4.  How your choice of algorithm relates to the datasets (was your choice of algorithm impacted by the datasets you chose)?
 
-4.  How your choice of algorithm relates to the datasets (was your choice of algorithm impacted by the datasets you chose)?
+    5.  Which result will you trust if you need to make a business decision?
 
-5.  Which result will you trust if you need to make a business decision?
+    6.  Do you think an analysis could be prone to errors when using too much data, or when using the least amount possible?
 
-6.  Do you think an analysis could be prone to errors when using too much data, or when using the least amount possible?
+    7.  How does the analysis between data sets compare?
 
-7.  How does the analysis between data sets compare?
+2.  Essay (minimum 500 word document)\
+    Write a short essay explaining your selection of algorithms and how they relate to the data and what you are trying to do
+
+## Essay
+
+Our goal was to understand and work with financial datasets. In line with the goal of this project we selected two large datasets (Credit Card Fraud and Lendingclub Loan). Both classification and regression methods (supervised learning) are good approaches for our datasets since we have availability of labeled samples.
+
+**LendingClub Loan (Fully Paid or Charged Off) Prediction (Large Volume - 300,000+):**
+
+LendingClub loan dataset is provided by Lending Club a peer-to-peer lending firm in San Francisco. Lending loans to risky customers can have a higher impact on credit loss. The dataset above is a good one as it has labeled data on loans that were "Fully Paid" or "Charged Off". Additionally, this dataset is a rich resource of other categorical potential predictor variables and lends itself well to exploratory data analysis as well as machine learning algorithms such as Logistic regression, RandomForest and Decision Tree models.
+
+<https://www.kaggle.com/datasets/jeandedieunyandwi/lending-club-dataset>
+
+**Credit Card Fraud (Fraud/Not-Fraud) Prediction (Medium Volume - 200,000+ ):** Fraud activity and customer behavior changes rapidly, causing non-stationary in the transaction data. Fraud represents a small fraction of the daily transactions. We then have a skewed dataset towards the genuine transactions. This yields to a highly imbalanced dataset. Statistical methods such as logistic regression can be applied for fraud detection for classification tasks, however, these are impacted by imbalance of the dataset and can be biased to predicting the majority class. We have also explored decision trees, wherein we can identify rules for predicting the correct class of transactions. We can identify the percentage of instances the condition of rule applies and the accuracy or confidence of a rule, which is predicting correct class of instances in which the condition of the rule applies. We would like to highlight the findings below through exploratory analysis, selection of models to train and then testing on subset of data.
+
+<https://data.world/vlad/credit-card-fraud-detection>
+
+**Reference thesis with the above dataset:** <https://di.ulb.ac.be/map/adalpozz/pdf/Dalpozzolo2015PhD.pdf>
+
+**Comparison between the two datasets:**
+
+While both datasets have a large number of records, we have selected the LendingClub loan dataset for our Large dataset for EDA and ML analysis and the Credit Card Fraud as a medium dataset for EDA and ML analysis. Our two datasets above are different in that the credit card fraud dataset is time series data, however the lendingclub loan dataset is not time series related. Therefore, we found the fraud dataset to be higher in complexity since it is time series data. We were able to train on large sample size here (227000+) and then apply the model on the test dataset.
+
+The Lendingclub dataset on the other hand has far more categorical variables than the credit card fraud dataset. We have dived into it further on the exploratory data analysis. Additionally, due to the size of the dataset (300000+ records), we subset the training set from a modeling perspective with data records from issue date of the loan after 2015-01-01. There were challenges in training the data on the higher number of samples, therefore we made a decision to subset the dataset to 100,000 records range and then split it up to train/test set. On this dataset, we were dealing with missing values, decision to drop certain values, review correlated values, additionally during model training, we found train/test split issues and had to ensure all factor levels are present in both train and test datasets.
 
 ## Large Data Set (End to End ML Analysis)
 
-### Data Set Introduction
+### Data set Introduction
+
+The Lendingclub loan data set consists of about 396,030 rows and 27 columns. Even though this dataset is large, we have carved out a subset of records with Time since first credit line \> 0 (Time since first credit line is a new engineered variable which is calculated by subtracting the time since first credit line from Issue date of the loan) and Issue date \> 2015-01-01 to look at a smaller population to model our dataset.
+
+### Data Exploration & Plots
+
+Several variables are character types and we will be converting those to factors prior to train and test split of the data. The dataset contains missing values recorded for 3 of the variables. We will also consider dropping certain variables such as address. Imputation of the missing values will be handled during data pre-processing step below. Additionally we created a parquet file since it was large volume and stored it on github.
+
+```{r}
+
+
+path1 = "https://github.com/BanuB/Card_Transaction_Fraud/raw/refs/heads/master/loandata.parquet" 
+
+inputf1 = read_parquet(path1)
+
+#Glimpse variables
+introduce(inputf1)
+plot_intro(inputf1)
+plot_missing(inputf1)
+glimpse(inputf1)
+unique(inputf1$loan_status)
+skim(inputf1) %>% kable()
+sapply(inputf1, function(x) sum(is.na(x))) %>% kable()
+
+
+```
+
+### Correlation Analysis
+
+Correlation plot reveals that some variables are inter correlated which may not be ideal and can cause unreliable regression estimates.Some steps we can take is combining variables or dropping certain variables. We will consider these later on. For instance total_acc and mort_acc are positively correlated below. Similarly loan_amt and installment have a positive correlation.
+
+```{r}
+# Select numeric columns only
+ numeric_data<- inputf1[sapply(inputf1, is.numeric)]
+M<- cor(numeric_data,use="complete.obs")
+ # M %>% kable() %>%
+ #  kable_styling()
+
+ggcorrplot(M, type = "upper", outline.color = "white",
+           ggtheme = theme_classic,
+           #colors = c("#6D9EC1", "white", "#E46726"),
+           lab = TRUE, show.legend = FALSE, tl.cex = 8, lab_size = 3)
+           
+# Calculate the correlation matrix
+correlation_matrix <- cor(numeric_data, use="complete.obs")
+kable(correlation_matrix)
+corrplot(correlation_matrix, method="circle")
+
+
+
+```
+
+#### Review Distributions
+
+Distributions of factor variables across loan statuses, starting with loan grades. Fully paid loans are at lower interest rates, and charged off loans have a more even distribution, tending towards mid tier interest rates.
+
+```{r}
+
+loan_stat_df <- subset(inputf1, !is.na(inputf1$loan_status)) %>% group_by(loan_status) %>% 
+    summarise(Number = n())
+loan_stat_df
+
+table(inputf1$loan_status, inputf1$grade)
+ggplot(inputf1, aes(x = int_rate))+ geom_histogram(aes(fill = grade)) + facet_wrap(~loan_status, ncol = 1)
+```
+
+Some additional EDA plots below to show a broader patterns within the data.Loan grades of type E, F, G have higher interest rates.D, E, F, G grade loans also show the presence of high number of outliers. Some of the density plots additionally show not many distributions have a normal bell curve. Additionally several have right skew in the distributions. Loan amount has a 0.78 positive skew value. Also the median loan amount seems to be \$12000.00. There are a good number of outliers on higher loan amounts that don't seem to be verified. Additionally, dataset has upto 59.2% of records of type debt consolidation.
+
+```{r}
+#Loan amt distribution
+ggplot(data=inputf1, aes(loan_amnt, fill=loan_status))+geom_histogram(bins = 40,color="blue")
+str(inputf1)
+
+ggplot(inputf1, aes(x=grade, y=loan_amnt, fill=grade)) +
+  stat_summary(fun.y="sum", geom="bar") +
+  labs(y ="Total Loan Amount",title="Total loan amount based on loan grade")
+
+ggplot(data=inputf1, aes(grade,int_rate,fill=grade))+geom_boxplot(outlier.color = "blue")+labs(title="Box plot of Interest rate")
+
+plot_density(inputf1)
+
+
+#Distribution of loan amount and purpose
+Desc(inputf1$loan_amnt, main = "Loan amount distribution", plotit = TRUE)
+Desc(inputf1$purpose, main = "Loan purposes", plotit = TRUE)
+
+#Distribution by verification status
+inputf1 %>% group_by(verification_status) %>% summarise(mean(loan_amnt), var(loan_amnt), mean(int_rate),mean(annual_inc))
+ggplot(data = inputf1,aes(x = verification_status, y = loan_amnt))+geom_boxplot()
+
+ggplot(data=inputf1,aes(loan_amnt, fill=grade))+
+  geom_density(alpha=0.25) + 
+  facet_grid(grade ~ .)
+
+#Distribution of loan status and grade
+table(inputf1$loan_status, inputf1$grade)
+ggplot(inputf1, aes(x = int_rate))+ geom_histogram(aes(fill = grade)) + facet_wrap(~loan_status, ncol = 1)
+
+
+
+```
+
+### Data Preparation (Imputation and Feature Engineering)
+
+Since mort_acc seems to have majority of values missing, since its positively correlated with total_acc, we have considered dropping this variable instead of imputing. Additionally, the address, title and emp_title had many levels, during our train/test process, these variables caused issues with factor levels missing in test dataset. We have also imputed 2 variables with their median and mean (since missing values were in the range of about 500 for these 2 variables)
+
+Therefore, we have chosen to drop these variables. Additionally, our randomForest did not run successfully on the large train dataset when we tried with a 80/20 split, therefore we have chosen to subset a smaller number of records to look at loans issued after 2015 (our subset of records we will use is 110,647).
+
+We have created one additional feature variable called "time since first credit line" was issued to see if there is any impact on the response variable.
+
+```{r}
+
+
+# drop address, mort_acc
+library(dplyr)
+library(gridExtra)
+library(grid)
+inputf1_new<- dplyr::select(inputf1,-c(mort_acc,address, title, emp_title))
+#glimpse(inputf1_new)
+
+
+inputf1_new %>% 
+  gather(variable, value) %>%
+  filter(is.na(value)) %>%
+  group_by(variable) %>%
+  tally() %>%
+  # dplyr::mutate(percent = (n / nrow(df)) * 100) %>%
+  # dplyr::mutate(percent = paste0(round(percent, ifelse(percent < 10, 1, 0)), "%")) %>%
+  # arrange(desc(n)) %>%
+  rename(`Variable Missing Data` = variable,
+         `Number of Records` = n) %>%
+      #   `Share of Total` = percent) %>%
+  kable() %>%
+  kable_styling()
+
+#impute with median
+#unique(inputf1_new$pub_rec_bankruptcies)
+mean1 <- round(median(inputf1_new$pub_rec_bankruptcies, na.rm = TRUE),0)
+inputf1_new[is.na(inputf1_new[,"pub_rec_bankruptcies"]), "pub_rec_bankruptcies"] <- mean1
+
+#impute with mean
+mean2 <- round(mean(inputf1_new$revol_util, na.rm = TRUE),0)
+inputf1_new[is.na(inputf1_new[,"revol_util"]), "revol_util"] <- mean2
+#unique(inputf1_new$revol_util)
+
+#create new variables
+inputf1_new$issue_d <- as.character(inputf1_new$issue_d)
+inputf1_new$issue_d <- paste(inputf1_new$issue_d, "-01", sep = "")
+inputf1_new$issue_d <- parse_date_time(inputf1_new$issue_d, "myd")
+
+inputf1_new$earliest_cr_line <- as.character(inputf1_new$earliest_cr_line)
+inputf1_new$earliest_cr_line <- paste(inputf1_new$earliest_cr_line, "-01", sep = "")
+inputf1_new$earliest_cr_line <- parse_date_time(inputf1_new$earliest_cr_line, "myd")
+
+inputf1_new$time_since_fcline <- inputf1_new$issue_d - inputf1_new$earliest_cr_line
+inputf1_new$time_since_fcline <- as.numeric(inputf1_new$time_since_fcline)
+
+inputf1_new2 <- inputf1_new %>% filter(time_since_fcline > 0 & issue_d > c("2015-01-01 UTC") )
+head(inputf1_new2$time_since_fcline)
+
+loan_stat_df1 <- subset(inputf1_new2, !is.na(inputf1_new2$loan_status)) %>% group_by(loan_status) %>% 
+    summarise(Number = n())
+loan_stat_df1
+
+
+ggplot(data = inputf1_new2 , aes(loan_status)) + geom_bar(position = "dodge") + 
+    labs(x = "Loan Status", title = "Distribution of Loan Status on our sample population of issue date after 2015-01-01") + theme(axis.text.x = element_text(angle = 90, 
+    hjust = 1))
+
+plot_missing(inputf1_new2)
+
+p1 <- ggplot(data = inputf1_new2, aes(loan_amnt, color = grade)) + geom_histogram(binwidth = 1000) +     facet_grid(grade ~ .)
+p2 <- ggplot(data = inputf1_new2, aes(loan_amnt, color = grade, fill = grade)) + geom_density(binwidth = 1000) + 
+    facet_grid(grade ~ .)
+
+grid.arrange(p1, p2, ncol = 2)
+
+ggplot(data = subset(inputf1_new2, !home_ownership %in% c("ANY", "NONE", "OTHER")), aes(y = home_ownership, 
+    purpose)) + geom_count(color = "Navy") + theme(axis.text.x = element_text(angle = 90, 
+    hjust = 1))
+
+ggplot(data = subset(inputf1_new2, (!is.na(home_ownership) & (!home_ownership %in% c("ANY", 
+    "NONE", "OTHER")))), aes(home_ownership, fill = grade, color = grade)) + 
+    geom_bar() + labs(title = "Distribution of Home Ownership by Loan Grade")
+
+inputf1_new2 %>% filter(!is.na(purpose)) %>% group_by(purpose) %>% summarise(mean_annual_inc = mean(annual_inc), 
+    mean_amnt_loan = mean(loan_amnt), n = n()) %>% ungroup() %>% arrange(desc(n))
+
+ggplot(data = subset(inputf1_new2, !is.na(purpose)), aes(purpose, fill = loan_status, 
+    color = loan_status)) + geom_bar() + labs(title = "Distribution of Loan purpose") + 
+    theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
+ggplot(data = subset(inputf1_new2, !is.na(verification_status)), aes(verification_status, 
+    fill = loan_status, color = loan_status)) + geom_bar(position = "fill") + 
+    labs(title = "Distribution of verification status by Loan Status") + scale_y_continuous(labels = percent_format())
+
+```
+
+Scatter plots in an attempt to identify trends between seemingly related numeric variables.
+
+This one plot suggests that the 60-month loans tend to have larger interest rates and be for larger loan amounts (the top right corner is dominated by blue points).
+
+```{r}
+set.seed(2024)
+
+#dim(inputf1_new2)
+#p<-table(inputf1_new2$loan_status, inputf1_new2$int_rate)
+#ggplot(inputf1_new2, aes(x = int_rate))+ geom_histogram() + facet_wrap(~loan_status, ncol = 1)
+
+#Distribution of loan status and grade
+#table(inputf1_new2$loan_status, inputf1_new2$grade)
+#ggplot(inputf1_new2, aes(x = int_rate))+ geom_histogram(aes(fill = grade)) + facet_wrap(~loan_status, ncol = 1)
+
+
+#Distribution of loan status and term
+table(inputf1_new2$loan_status, inputf1_new2$term)
+
+
+index = createDataPartition(y = inputf1_new2$loan_status, p = 0.90)[[1]]
+loans.sample <- inputf1_new2[-index,]
+ggplot(loans.sample, aes(x = loan_amnt, y = int_rate)) + geom_point(aes(color = term))
+
+
+
+```
+
+### Algorithm Selection/Build Models
+
+### Decision Tree Model and metrics review
+
+For model selection,we have created a partition of the 110,647 records and created 70/30 split of the dataset. The accuracy of our Basic decision tree model is 0.7835.
+
+We have shown an example of pruned tree below. Overly complex trees have high variance. We set complexity Parameter of 0 as a measure of the required split improvement. The parameter modulates the amount by which splitting a given node improved the minimum error of 0.001435764 so that a spit can be justified.Additionally, we have printed the decision tree rules that were generated by the model on the pruned instance of the tree.
+
+The Sensitivity (true positive rate) and Specificity (true negative rate) are below for the baseline model.Sensitivity is the metric that evaluates a model’s ability to predict true positives of each available category. Specificity is the metric that evaluates a model’s ability to predict true negatives of each available category.The sensitivity of the model is very low, this implies that the model did not successfully classify the "charged off" loans accurately.Sensitivity : 0.10973 Specificity : 0.97219.
+
+Since our train dataset is highly imbalanced, we can use the ROC curve since we can't simply use the accuracy measure.Area under the curve (AUC): 0.690. We can try to over, under or combine both sampling method to balance the class prior to running the model to avoid class imbalance issues.
+
+For reference of classification categories of the confusion matrix is given below.
+
+True Positive (TP) – An instance that is positive and is classified correctly as positive True Negative (TN) – An instance that is negative and is classified correctly as negative False Positive (FP) – An instance that is negative but is classified wrongly as positive False Negative (FN) – An instance that is positive but is classified incorrectly as negative
+
+```{r}
+
+#install.packages("RGtk2")
+
+library("rattle")
+library(rpart.plot)
+library(rpart)
+#install.packages("vip")
+library(vip)
+
+
+set.seed(2024)
+index = createDataPartition(y = inputf1_new2$loan_status, p = 0.7)[[1]]
+loans.test <- inputf1_new2[-index,]
+loans.train <- inputf1_new2[index,]
+
+
+loans.rpart.1 <- rpart(loan_status ~ . , data = loans.train, 
+                      control=rpart.control(minsplit=10, minbucket = 3, cp=0.0006))
+
+fancyRpartPlot(loans.rpart.1)
+predictions.1 <- (predict(loans.rpart.1, loans.test , type = "class")) 
+p1<-confusionMatrix(predictions.1,as.factor(loans.test$loan_status))
+roc.curve(loans.test$loan_status, predict(loans.rpart.1, loans.test, type = "prob")[,1], plot = TRUE)
+p1
+
+
+#rpart.plot(loans.rpart.1, type = 4, extra = 101, under = TRUE, cex = 0.8, box.palette = "auto")
+rules<- rpart.rules(loans.rpart.1)
+head(rules, 4) %>% kable() 
+
+
+# Create a variable importance plot
+var_importance <- vip::vip(loans.rpart.1, num_features = 30)
+print(var_importance)
+
+plotcp(loans.rpart.1)
+costdt <- data.frame(printcp(loans.rpart.1))
+
+min_err <- (costdt  %>% filter(nsplit > 1) %>% slice(which.min(xerror)))$CP
+cat("Minimum Error: ", min_err)
+
+loan_prune <- rpart::prune(loans.rpart.1,min_err)
+rpart.plot(loan_prune, box.col = c("pink", "palegreen3")[loans.rpart.1$frame$yval])
+
+loan_prune_pred <- predict(loan_prune, loans.test, type = "class")
+#prunedcm <- confusionMatrix(loan_prune_pred, as.factor(loans.test$loan_Status))
+# dt_pruned_cm$table
+
+roc.curve(loans.test$loan_status, predict(loan_prune, loans.test, type = "prob")[,1], plot = TRUE)
+p1
+
+rules<- rpart.rules(loan_prune)
+head(rules) %>% kable() 
+
+
+```
+
+### Oversampling and fixing class imbalance and rerunning decision tree model.
+
+We have tried over sample/under sample and combined with "Both" option on the train dataset to see if we can fix the class imbalance. The resulting model has jumped in sensitivity, however, it has misclassified large \# of records as charged off when they were full paid. We will need to try to understand why this maybe potentially as a follow-up to this project.
+
+```{r}
+set.seed(2024)
+
+glimpse(loans.train)
+glimpse(loans.test)
+
+loans.oversample <- ovun.sample(loan_status ~ ., data = loans.train, method = "both",N = 77454, seed = 13)$data
+table(loans.oversample$loan_status)
+table(loans.train$loan_status)
+
+barplot(table(loans.train$loan_status) , col = 'lightblue')
+barplot(table(loans.oversample$loan_status) , col = 'lightblue')
+
+tune <- data.frame(0.001)
+colnames(tune) <- "cp"
+tr_control <- trainControl(method = "cv",number = 10, verboseIter = TRUE)
+loans.over <- train(loan_status ~., data = loans.oversample, method = "rpart", trControl = tr_control, tuneGrid = tune, control=rpart.control(minsplit=10, minbucket = 3))
+
+fancyRpartPlot(loans.over$finalModel)
+confusionMatrix(predict(loans.over, loans.test), as.factor(loans.test$loan_status))
+
+
+
+```
+
+### Logistic Regression (Train Data set)
+
+Here we have run the 2nd full baseline Logistic regression model and then additionally run the model with stepAIC on the over sampled train data from prior section and compared the metrics on both models.We hit several issues during model train, due to non-conversion of variables to factor type rather than character type. Once that was fixed, we proceeded to run the model and then store the values of accuracy, sensitivity and specificity.The logistic regression model accuracy with the stepAIC improved a lot after using stepAIC method. All 3 parameters were the best so far. (accuracy)0.673135 (sensitivity)0.6847482 (specificity)0.6614412
+
+```{r}
+
+loans.oversample1 <- loans.oversample %>% mutate(loan_outcome = ifelse(loan_status %in% c('Charged Off' , 'Default') , 1, ifelse(loan_status == 'Fully Paid' , 0 , 'No info')))
+
+loans.oversample1 <- loans.oversample1[, colnames(loans.oversample1)[colnames(loans.oversample1) != 'loan_status']]
+
+
+loans.oversample1 <- loans.oversample1[, colnames(loans.oversample1)[colnames(loans.oversample1) != 'issue_d']]
+
+loans.oversample1 <- loans.oversample1[, colnames(loans.oversample1)[colnames(loans.oversample1) != 'earliest_cr_line']]
+
+factorize = function(column, df){
+  #' Check if column is character and  turn to factor
+
+  if(class(df[1,column]) == "character"){
+    out = as.factor(df[,column])
+  } else { # if it's numeric
+    out = df[,column]
+  }
+  return(out)
+}
+
+# str(loans.oversample)
+# str(loans.oversample1)
+# class(loans.oversample1[1,"term"])
+store.colnames = colnames(loans.oversample1)
+loans.oversample3  = lapply(store.colnames, function(column) factorize(column, loans.oversample1))
+loans.oversample3= as.data.frame(loans.oversample3 )
+colnames(loans.oversample3)=store.colnames
+
+
+full.reg <- glm(loan_outcome ~ ., data =loans.oversample3, family = "binomial")
+loans.reg  <- stepAIC(full.reg, direction = "both")
+
+
+summary(full.reg)
+summary(loans.reg)
+
+coef(loans.reg)
+head(predict(loans.reg, type="response"))
+#model_glm_pred = predict(loans.reg, type="response")
+model_glm_pred = ifelse(predict(loans.reg, type = "response") > 0.5, 1, 0)
+
+calc_class_err = function(actual, predicted) {
+  mean(actual != predicted)
+}
+
+calc_class_err(actual = loans.oversample3$loan_outcome, predicted = model_glm_pred)
+
+train_tab = table(predicted = model_glm_pred, actual = loans.oversample3$loan_outcome)
+library(caret)
+train_con_mat = confusionMatrix(train_tab, positive = "1")
+c(train_con_mat$overall["Accuracy"], 
+  train_con_mat$byClass["Sensitivity"], 
+  train_con_mat$byClass["Specificity"])
+
+#Create function
+get_logistic_error = function(mod, data, res = "y", pos = 1, neg = 0, cut = 0.5) {
+  probs = predict(mod, newdata = data, type = "response")
+  preds = ifelse(probs > cut, pos, neg)
+  calc_class_err(actual = data[, res], predicted = preds)
+}
+
+get_logistic_error(loans.reg, data = loans.oversample3, 
+                   res = "loan_outcome", pos = 1, neg = 0, cut = 0.5)
+
+performance_df <- data.frame(Model = NULL, Accuracy = NULL, Sensitivity = NULL, Specificity = NULL)
+perf_dt <- data.frame(Model = "loans.reg Logistic with stepAIC", Accuracy = train_con_mat$overall[1], Sensitivity = train_con_mat$byClass[1], Specificity = train_con_mat$byClass[2])
+performance_df <- rbind(performance_df, perf_dt)
+perf_dt
+
+perf_dt3 <- data.frame(Model = "Decision Tree Baseline", Accuracy = p1$overall[1], Sensitivity = p1$byClass[1], Specificity = p1$byClass[2])
+performance_df <- rbind(performance_df, perf_dt3)
+perf_dt3
+
+```
+
+### Logistic Regression (Test Data set)
+
+After training on the test set, our metrics were similar to the train dataset. Accuracy : 0.6645 Sensitivity : 0.6576\
+Specificity : 0.6891 AUC(0.7358227)
+
+```{r}
+
+library(ROCR)
+set.seed(2024)
+
+loans.test4 <- as.data.frame(loans.test)
+barplot(table(loans.test4$loan_status) , col = 'lightblue')
+table(loans.test4$loan_status)
+#Use under and oversampling
+# loans.oversample.test1 <- ovun.sample(loan_status ~ ., data = loans.test4, method = "both",N = 33193 , seed = 13)$data
+# barplot(table(loans.oversample.test1 $loan_status) , col = 'lightblue')
+
+
+loans.test1 <- loans.test4  %>% mutate(loan_outcome = ifelse(loan_status %in% c('Charged Off' ) , 1, ifelse(loan_status == 'Fully Paid' , 0,'none' )))
+
+barplot(table(loans.test1$loan_outcome) , col = 'lightblue')
+table(loans.test1$loan_outcome)
+
+loans.test1 <- loans.test1[, colnames(loans.test1)[colnames(loans.test1) != 'loan_status']]
+
+loans.test1 <- loans.test1[, colnames(loans.test1)[colnames(loans.test1) != 'issue_d']]
+
+
+loans.test1 <- loans.test1[, colnames(loans.test1)[colnames(loans.test1) != 'earliest_cr_line']]
+
+
+# str(loan.test4)
+# term  
+# grade              
+# sub_grade          
+# emp_length          
+# home_ownership  
+# verification_status 
+# purpose
+# initial_list_status
+# application_type
+# loan_outcome
+# 
+# class(loans.test1[1,"grade"])
+# 
+# store.colnames1 = c("term",
+#                     "grade",
+#                     "sub_grade",
+#                     "emp_length",
+#                     "home_ownership",
+#                     "verification_status",
+#                     "purpose",
+#                     "initial_list_status",
+#                     "application_type",
+#                     "loan_outcome")
+#                     
+store.colnames1=colnames(loans.test1)
+loans.test3  = lapply(store.colnames1, function(column) factorize(column, loans.test1))
+loans.test3 = as.data.frame(loans.test3 )
+colnames(loans.test3)=store.colnames1
+
+
+loans.over.2 <- train(loan_outcome ~ loan_amnt + term + int_rate + installment + sub_grade + 
+    emp_length + home_ownership + verification_status + purpose + 
+    dti + open_acc + pub_rec + revol_bal + revol_util + total_acc + 
+    initial_list_status + application_type + pub_rec_bankruptcies + 
+    time_since_fcline , data = loans.oversample3, method = "glm")
+
+confusionMatrix(predict(loans.over.2, loans.test3), as.factor(loans.test3$loan_outcome))
+
+loans.2.prediction <- prediction(predict(loans.over.2, newdata = loans.test3, type = "prob")[,"1"], loans.test3$loan_outcome)
+performance(loans.2.prediction , measure = "auc")@y.values
+
+
+# Make predictions and pre accuracy for full model
+probabilities <- predict(full.reg, loans.test3, type = "response")
+predicted.classes <- ifelse(probabilities > 0.5, 1, 0)
+# Prediction accuracy
+observed.classes <- loans.test3$loan_outcome
+mean(predicted.classes == observed.classes)
+
+# Make predictions and pre accuracy for stepwise model
+probabilities <- predict(loans.reg, loans.test3, type = "response")
+predicted.classes <- ifelse(probabilities > 0.5, 1, 0)
+# Prediction accuracy
+observed.classes <- loans.test3$loan_outcome
+mean(predicted.classes == observed.classes)
+
+get_logistic_error(full.reg, data = loans.test3, 
+                   res = "loan_outcome", pos = 1, neg = 0, cut = 0.5)
+
+get_logistic_error(loans.reg, data = loans.test3, 
+                   res = "loan_outcome", pos = 1, neg = 0, cut = 0.5)
+
+#A good model will have a high AUC, that is as often as possible a high sensitivity and specificity.
+test_prob = predict(loans.reg, newdata = loans.test3, type = "response")
+test_roc = roc( loans.test3$loan_outcome ~ test_prob, plot = TRUE, print.auc = TRUE)
+
+as.numeric(test_roc$auc)
+
+```
+
+### Random Forest Model
+
+We implemented the random forest model, however, we were not able to use some of the functionality of the randomForestExplainer model. Therefore we were able to display some importance measures.
+
+The first measure is computed from permuting OOB data: For each tree, the prediction error on the out-of-bag portion of the data is recorded (error rate for classification, MSE for regression). Then the same is done after permuting each predictor variable. The difference between the two are then averaged over all trees, and normalized by the standard deviation of the differences. If the standard deviation of the differences is equal to 0 for a variable, the division is not done (but the average is almost always equal to 0 in that case). The second measure is the total decrease in node impurities from splitting on the variable, averaged over all trees. For classification, the node impurity is measured by the Gini index. For regression, it is measured by residual sum of squares.
+
+```{r}
+
+#install.packages("randomForestExplainer")
+library(randomForest)
+library(ipred)
+library(randomForestExplainer)
+
+set.seed(2024)
+
+seat_forest = randomForest(loan_outcome ~ ., data = loans.oversample3, mtry = 3, importance = TRUE, ntrees = 500)
+seat_forest
+
+print(seat_forest)
+plot(seat_forest)
+
+# colnames(loans.oversample3)
+# str(loans.oversample3)
+# colnames(loans.test3)
+# str(loans.test3)
+
+levels( loans.oversample3$home_ownership)
+allvalues <- unique(levels( loans.oversample3$home_ownership)) 
+loans.test3$home_ownership <- x <- factor(loans.test3$home_ownership, levels = allvalues)
+levels( loans.test3$home_ownership)
+
+common <- intersect(names(loans.oversample3), names(loans.test3)) 
+for (p in common) { 
+  if (class(loans.oversample3[[p]]) == "factor") { 
+    levels(loans.test3[[p]]) <- levels(loans.oversample3[[p]]) 
+  } 
+}
+
+seat_forest_tst_perd = predict(seat_forest, loans.test3)
+table(predicted = seat_forest_tst_perd, actual = loans.test3$loan_outcome)
+rf_cm <- confusionMatrix(seat_forest_tst_perd, loans.test3$loan_outcome)
+
+
+randomForest::importance(seat_forest, type=1)
+randomForest::importance(seat_forest, type=2)
+
+par(mfrow = c(1, 2))
+varImpPlot(seat_forest, type=1, main = "Importance: permutation")
+varImpPlot(seat_forest, type=2, main = "Importance: node impurity")
+
+#var_imp <- measure_importance(seat_forest)
+
+perf_dt4 <- data.frame(Model = "Random forest", Accuracy = rf_cm$overall[1], Sensitivity = rf_cm$byClass[1], Specificity = rf_cm$byClass[2])
+performance_df <- rbind(performance_df, perf_dt4)
+
+performance_df 
+
+
+
+```
+
+## Medium Data Set (End to End ML Analysis)
+
+### Data set Introduction
 
 The large data set consists of about 284,000 card transactions that are labelled as non-fraud and fraud. It is a real data set from a European financial institution, which is why the features are masked. They are the result of extensive PCA. Additionally, it is a highly imbalanced data set, as there are several orders of magnitude more non-fraud than fraud transactions.
 
@@ -82,6 +702,22 @@ ggplot(tx_1, aes(x = Amount)) +
   geom_histogram(position = "dodge", bins = 60) +
   labs(title = "Histogram of Amounts for Class Fraud", x = "Amount (USD)", y = "Frequency") +
   theme_minimal()
+
+#Outlier plot
+ggplot(tx_1, aes(x = Amount)) +
+  geom_boxplot(position = "dodge", bins = 60) +
+  labs(title = "Histogram of Amounts for Class Fraud", x = "Amount (USD)", y = "Frequency") +
+  theme_minimal()
+
+# Scatterplot
+
+tx_1 %>% ggplot(aes(x=Time, y=Amount)) +
+  geom_point() +
+  labs(
+  y = "Amount ($)", 
+  x = "Time (s)",
+  title= "Fraudulent Transactions Across Time"
+ )
 
 #Correlation Heatmap
 tx_raw_numeric = tx_raw %>%
@@ -143,7 +779,7 @@ When investigating the plots from the EDA above one thing becomes clear: the dat
 
 Additionally, there are a few more interesting observations. For example, the correlation matrix between all features show no strong correlation between each other. This is important for several machine learning algorithms, and considering that this data set has undergone feature engineering and PCA, it is unsurprising that this is case. Nevertheless, this plot should be part of any machine learning implementation.
 
-Looking at the time-series graph, plotting the amounts of transactions per hour, over the time span of the data set, the cyclic nature of the non-fraud transactions is very apparent. This is not existent in the fraud transactions, which are mostly randomly happening. This can also be observed in the auto-correlations: &rho; for the non-fraud transactions is 0.92, which points to a strong predictability for the next data point (i.e., after an increase in count, another increase if followed). The negative &rho; of -0.23 of the fraudulent transactions points to a more random behavior across these two and a half days of time period of the data set. This feature will surely be quite important for the algorithm during training.
+Looking at the time-series graph, plotting the amounts of transactions per hour, over the time span of the data set, the cyclic nature of the non-fraud transactions is very apparent. This is not existent in the fraud transactions, which are mostly randomly happening. This can also be observed in the auto-correlations: ρ for the non-fraud transactions is 0.92, which points to a strong predictability for the next data point (i.e., after an increase in count, another increase if followed). The negative ρ of -0.23 of the fraudulent transactions points to a more random behavior across these two and a half days of time period of the data set. This feature will surely be quite important for the algorithm during training.
 
 Lastly, these auto-correlations can be seen in the ACF plot, that shows different lags. It can be seen that the strongest lag is 1, with decreasing auto-correlations with larger lags.
 
@@ -190,6 +826,7 @@ time_logistic_train = system.time({
 #Decision Tree
 time_tree_train = system.time({
   tree_model = train(Class ~ ., data = dataTrain, method = "rpart", trControl = train_control)})
+
 ```
 
 #### Predictions and Evaluation
@@ -255,24 +892,29 @@ ggplot(coefficients, aes(x = reorder(term, estimate), y = estimate)) +
   theme_minimal()
 
 rpart.plot(tree_model$finalModel)
+
+rules1<- rpart.rules(tree_model$finalModel)
+rules1 %>% kable() 
 ```
 
 In order to further understand the predictive quality of both models, we decided to compute ROC curves that plot specificity against sensitivity, and here found, interestingly, that the logistic regression was much better across the board than the decision tree. It is likely that the tree over fit, which leads to diminished predictive quality. While the accuracy is still high, this does not mean that it stays high with other unseen data.
 
 Therefore, in the current case, we'd be deciding to utilize logistic regression over the decision tree. While again, an ensemble of trees would likely outperform the logistic regression, even with a smaller data set.
 
-### Large Dataset Essay Summary
+## Conclusion and Summary Essay
 
-## Small DataSet (End to End ML Analysis)
+**Note:** Both dataset had responded well to Decision Tree and Logistic Regression modeling as expected.
 
-### Dataset Introduction
+On the lending loan dataset, we have updated results on 3 models and their performance metrics such as accuracy, sensitivity and specificity.
 
-### Data Exploration & Plots
+Sensitivity (True Positive Rate): measures the proportion of applicants that were predicted as charged off, who were actually charged off in the test dataset Specificity (True Negative Rate): measures the proportion of applicants that were predicted to be charged off and were also charged off in the test dataset
 
-### Data Preparation
+The ensemble model performed the best if we review all 3 metrics since we had better values across all 3 metrics. We would like to look into further the decision tree baseline model for this dataset as it had a very low sensitivity since we had updated the dataset with overampled/under sampled data.
 
-### Algorithm Selection/Build Models
+On the fraud dataset, we decided to utilize the logistic regression over the decision tree. While we did not run the ensemble methods here which may yield a better result in the future.
 
-### Large DataSet Essay Summary
+**Takeaways:** Additionally the RandomForest took significant amount of time to run and we were unable to load the importance measures through the randomForestExplainer package. We were unable to save the .RDA file with the importance measures on the test model output. We would like to further review this in the future. We would like to further expand on time series with "fpp3" package in the future on the credit dataset to look at further extrapolations of the time series data and forecasting methods to answer questions such as can we forecast credit card fraud given the dataset, are there any seasonal patterns when frauds occur?
 
-## Joint Comparison and Summary Essay
+## References
+
+https://www.kaggle.com/code/krishnaraj30/xgboost-loan-defaulters-prediction https://www.kaggle.com/code/heidarmirhajisadati/advancedtechniques-for-detecting-credit-card-fraud/notebook https://rpubs.com/DeclanStockdale/799284 https://htmlpreview.github.io/?https://github.com/geneticsMiNIng/BlackBoxOpener/blob/master/randomForestExplainer/inst/doc/randomForestExplainer.html
